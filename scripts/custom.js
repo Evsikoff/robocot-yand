@@ -68,10 +68,61 @@
     document.body.appendChild(logoContainer);
   }
 
+  function setupLogoHiding() {
+    const logoContainer = document.getElementById(logoContainerId);
+    if (!logoContainer) return;
+
+    // Отслеживаем клики по всему документу
+    document.addEventListener('click', function(event) {
+      const target = event.target;
+
+      // Проверяем, был ли клик по кнопке или ссылке, которая может запустить игру
+      if (target.tagName === 'BUTTON' || target.tagName === 'A' ||
+          target.closest('button') || target.closest('a')) {
+
+        // Проверяем текст элемента на наличие слов, связанных со стартом игры
+        const text = target.textContent || '';
+        const isStartButton = /начать|start|играть|play|старт/i.test(text);
+
+        if (isStartButton) {
+          // Скрываем логотип с плавной анимацией
+          logoContainer.style.transition = 'opacity 0.5s ease-out';
+          logoContainer.style.opacity = '0';
+          setTimeout(() => {
+            logoContainer.style.display = 'none';
+          }, 500);
+        }
+      }
+    });
+
+    // Также отслеживаем изменения в DOM
+    const observer = new MutationObserver(function(mutations) {
+      // Проверяем, не появилось ли игровое поле
+      // Обычно при старте игры добавляются новые элементы
+      const hasGameElements = document.querySelector('canvas, [class*="game"], [class*="level"], [class*="board"]');
+
+      if (hasGameElements && logoContainer.style.display !== 'none') {
+        logoContainer.style.transition = 'opacity 0.5s ease-out';
+        logoContainer.style.opacity = '0';
+        setTimeout(() => {
+          logoContainer.style.display = 'none';
+        }, 500);
+        observer.disconnect();
+      }
+    });
+
+    // Начинаем наблюдение за изменениями в body
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
   function init() {
     injectHidingStyles();
     injectLogoStyles();
     injectLogo();
+    setupLogoHiding();
   }
 
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
