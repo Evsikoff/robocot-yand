@@ -72,6 +72,8 @@
     const logoContainer = document.getElementById(logoContainerId);
     if (!logoContainer) return;
 
+    let gameStarted = false;
+
     // Отслеживаем клики по всему документу
     document.addEventListener('click', function(event) {
       const target = event.target;
@@ -85,6 +87,7 @@
         const isStartButton = /начать|start|играть|play|старт/i.test(text);
 
         if (isStartButton) {
+          gameStarted = true;
           // Скрываем логотип с плавной анимацией
           logoContainer.style.transition = 'opacity 0.5s ease-out';
           logoContainer.style.opacity = '0';
@@ -95,10 +98,12 @@
       }
     });
 
-    // Также отслеживаем изменения в DOM
+    // Также отслеживаем изменения в DOM, но только после клика на кнопку старта
     const observer = new MutationObserver(function(mutations) {
+      // Проверяем только если игра уже начата
+      if (!gameStarted) return;
+
       // Проверяем, не появилось ли игровое поле
-      // Обычно при старте игры добавляются новые элементы
       const hasGameElements = document.querySelector('canvas, [class*="game"], [class*="level"], [class*="board"]');
 
       if (hasGameElements && logoContainer.style.display !== 'none') {
