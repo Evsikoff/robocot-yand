@@ -2589,16 +2589,12 @@
     return isWebView;
   }
 
-  // Detect if the game is embedded on Yandex Games in an iframe
+  // Detect if the game is embedded in an iframe (Yandex Games or similar platform)
   function isYandexIframe() {
+    // This game is designed for Yandex Games, so if we're in an iframe, reset to start screen
     const inIframe = window.self !== window.top;
-    const search = window.location.search.toLowerCase();
-    const referrer = document.referrer.toLowerCase();
-    const hasYandexParam = search.includes('yandex') || search.includes('ya_app_id') || search.includes('app-id');
-    const isYandexReferrer = referrer.includes('yandex.ru') || referrer.includes('yandex.com');
-    const result = inIframe && (hasYandexParam || isYandexReferrer);
-    debugLog('isYandexIframe:', result, { inIframe, hasYandexParam, isYandexReferrer });
-    return result;
+    debugLog('isYandexIframe:', inIframe, { inIframe });
+    return inIframe;
   }
 
   // Safe storage wrapper
