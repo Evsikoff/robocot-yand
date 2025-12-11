@@ -2589,6 +2589,18 @@
     return isWebView;
   }
 
+  // Detect if the game is embedded on Yandex Games in an iframe
+  function isYandexIframe() {
+    const inIframe = window.self !== window.top;
+    const search = window.location.search.toLowerCase();
+    const referrer = document.referrer.toLowerCase();
+    const hasYandexParam = search.includes('yandex') || search.includes('ya_app_id') || search.includes('app-id');
+    const isYandexReferrer = referrer.includes('yandex.ru') || referrer.includes('yandex.com');
+    const result = inIframe && (hasYandexParam || isYandexReferrer);
+    debugLog('isYandexIframe:', result, { inIframe, hasYandexParam, isYandexReferrer });
+    return result;
+  }
+
   // Safe storage wrapper
   const safeStorage = {
     getItem: function(storage, key) {
@@ -2619,32 +2631,60 @@
     }
   };
 
-  // Reset navigation to home page for WebView on first load
+  // Reset navigation to home page for WebView or Yandex iframe on first load
   function resetNavigationForWebView() {
-    if (!isAndroidWebView()) return;
+    const shouldReset = isAndroidWebView() || isYandexIframe();
+    if (!shouldReset) return;
+
+    const resetFlag = 'robocotNavReset';
+    if (sessionStorage.getItem(resetFlag) === 'done') {
+      debugLog('resetNavigationForWebView skipped (already ran)');
+      return;
+    }
 
     debugLog('resetNavigationForWebView called');
 
-    // Clear any saved routing state on every WebView load
     try {
       const keysToRemove = [];
+      const prefixesToClear = ['route', 'path', 'location', 'redux_localstorage_simple', 'persist:'];
+
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key.includes('route') || key.includes('path') || key.includes('location'))) {
+        if (!key) continue;
+
+        const shouldRemove = prefixesToClear.some(prefix => key.includes(prefix));
+        if (shouldRemove) {
           keysToRemove.push(key);
         }
       }
+
       keysToRemove.forEach(key => safeStorage.removeItem(localStorage, key));
-      debugLog('Cleared routing keys:', keysToRemove.length);
+      debugLog('Cleared persisted keys:', keysToRemove);
     } catch (e) {
       debugLog('Could not clear localStorage:', e.message);
     }
 
-    // Force navigation to root if not already there (without reload)
-    if (window.location.pathname !== '/' && window.location.pathname !== '' && window.location.hash !== '#/') {
-      debugLog('Redirecting to root from:', window.location.pathname);
-      window.history.replaceState(null, '', '/');
+    try {
+      sessionStorage.clear();
+      debugLog('sessionStorage cleared');
+    } catch (e) {
+      debugLog('Could not clear sessionStorage:', e.message);
     }
+
+    const targetUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+
+    if (window.location.href !== targetUrl || window.location.hash) {
+      debugLog('Redirecting to clean URL from:', {
+        current: window.location.href,
+        target: targetUrl,
+        hash: window.location.hash
+      });
+      sessionStorage.setItem(resetFlag, 'done');
+      window.location.replace(targetUrl);
+      return;
+    }
+
+    sessionStorage.setItem(resetFlag, 'done');
   }
 
   function injectHidingStyles() {
