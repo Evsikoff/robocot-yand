@@ -52,13 +52,19 @@
           return null;
         }
 
-        return YaGames.init({ lang: 'ru' });
+        // Set Russian locale without the deprecated top-level `lang` option.
+        return YaGames.init({ i18n: { lang: 'ru' } });
       })
       .then((sdk) => {
         ysdkInstance = sdk;
         gameplayApi = sdk?.features?.GameplayAPI;
         loadingApi = sdk?.features?.LoadingAPI;
         adApi = sdk?.adv || sdk?.getAdManager?.();
+
+        // Fallback for SDK versions that expect language to be set post-init.
+        if (sdk?.environment?.i18n?.setLang) {
+          sdk.environment.i18n.setLang('ru');
+        }
 
         if (sdk) {
           debugLog('YaGames SDK initialized');
