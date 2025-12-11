@@ -4,9 +4,141 @@
   const logoContainerId = 'robocot-logo-container';
   const mobileButtonStyleId = 'robocot-mobile-button-style';
 
+  let ysdkPromise = null;
+  let ysdkInstance = null;
+  let gameplayApi = null;
+  let loadingApi = null;
+  let adApi = null;
+  let loadingReadySent = false;
+  let gameLoaded = document.readyState === 'complete';
+
   // Debug logging for WebView
   function debugLog(message, data) {
     console.log('[Robocot WebView]', message, data || '');
+  }
+
+  function waitForYaGamesSdk() {
+    if (typeof YaGames !== 'undefined') {
+      return Promise.resolve(YaGames);
+    }
+
+    debugLog('YaGames SDK not found on window, attempting to load dynamically');
+
+    return new Promise((resolve) => {
+      const existingScript = document.querySelector('script[src*="yandex.ru/games/sdk"]');
+
+      if (existingScript) {
+        existingScript.addEventListener('load', () => resolve(YaGames));
+        existingScript.addEventListener('error', () => resolve(null));
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://yandex.ru/games/sdk/v2';
+      script.async = true;
+      script.onload = () => resolve(YaGames);
+      script.onerror = () => resolve(null);
+      document.head.appendChild(script);
+    });
+  }
+
+  function initYsdk() {
+    if (ysdkPromise) return ysdkPromise;
+
+    ysdkPromise = waitForYaGamesSdk()
+      .then((YaGames) => {
+        if (!YaGames) {
+          debugLog('YaGames SDK failed to load');
+          return null;
+        }
+
+        // Set Russian locale without the deprecated top-level `lang` option.
+        return YaGames.init({ i18n: { lang: 'ru' } });
+      })
+      .then((sdk) => {
+        ysdkInstance = sdk;
+        gameplayApi = sdk?.features?.GameplayAPI;
+        loadingApi = sdk?.features?.LoadingAPI;
+        adApi = sdk?.adv || sdk?.getAdManager?.();
+
+        // Fallback for SDK versions that expect language to be set post-init.
+        if (sdk?.environment?.i18n?.setLang) {
+          sdk.environment.i18n.setLang('ru');
+        }
+
+        if (sdk) {
+          debugLog('YaGames SDK initialized');
+          sendLoadingReady();
+        }
+
+        return sdk;
+      })
+      .catch((err) => {
+        debugLog('Error initializing YaGames SDK:', err);
+        return null;
+      });
+
+    return ysdkPromise;
+  }
+
+  function sendLoadingReady() {
+    if (loadingReadySent || !gameLoaded) return;
+
+    initYsdk().then(() => {
+      if (loadingReadySent) return;
+
+      if (loadingApi?.ready) {
+        loadingApi.ready();
+        loadingReadySent = true;
+        debugLog('LoadingAPI.ready() called');
+      }
+    });
+  }
+
+  function markGameLoaded() {
+    gameLoaded = true;
+    sendLoadingReady();
+  }
+
+  function startGameplay(reason) {
+    initYsdk().then(() => {
+      if (gameplayApi?.start) {
+        gameplayApi.start();
+        debugLog('GameplayAPI.start() called', reason);
+      }
+    });
+  }
+
+  function stopGameplay(reason) {
+    initYsdk().then(() => {
+      if (gameplayApi?.stop) {
+        gameplayApi.stop();
+        debugLog('GameplayAPI.stop() called', reason);
+      }
+    });
+  }
+
+  function showFullscreenAd() {
+    return initYsdk().then(() => {
+      if (adApi?.showFullscreenAdv) {
+        debugLog('Showing fullscreen advertisement');
+        return adApi.showFullscreenAdv({
+          callbacks: {
+            onClose: () => debugLog('Fullscreen ad closed'),
+            onError: (err) => debugLog('Fullscreen ad error', err)
+          }
+        });
+      }
+
+      debugLog('Fullscreen ad API is unavailable');
+      return Promise.resolve();
+    });
+  }
+
+  function blockContextMenu() {
+    window.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+    });
   }
 
   // Detect if running in Android WebView
@@ -133,9 +265,11 @@
     const style = document.createElement('style');
     style.id = mobileButtonStyleId;
     style.textContent = `
-      /* Adjust "Выбрать уровень" button for all devices */
+      /* Center "Выбрать уровень" button on all devices */
       .be2f2 {
-        top: calc(50% + 100px) !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
       }
 
       /* Adjust note button for all devices */
@@ -146,7 +280,9 @@
       /* Fine tune button positions for landscape orientation */
       @media screen and (orientation: landscape) {
         .be2f2 {
-          top: calc(50% + 70px) !important;
+          top: 50% !important;
+          left: 50% !important;
+          transform: translate(-50%, -50%) !important;
         }
 
         ._400b2 {
@@ -414,11 +550,99 @@
     }, 1000);
   }
 
+  function elementMatchesText(element, text) {
+    return element && element.textContent && element.textContent.trim() === text;
+  }
+
+  function setupStartButtonHandler() {
+    document.addEventListener('click', (event) => {
+      const target = event.target;
+
+      const startButton = target.closest('button');
+      if (startButton && elementMatchesText(startButton, 'Начать игру')) {
+        startGameplay('start-button');
+        return;
+      }
+
+      if (target.closest('button._4e75b')) {
+        showFullscreenAd()
+          .catch(() => {})
+          .finally(() => startGameplay('next-button'));
+        return;
+      }
+
+      if (target.closest('button.db317')) {
+        startGameplay('play-again-button');
+        return;
+      }
+
+      if (target.closest('button._29fe1') || target.closest('div._42bf8')) {
+        startGameplay('tutorial-close');
+      }
+    });
+  }
+
+  function setupTrainingModalObserver() {
+    let tutorialVisible = false;
+
+    const syncTutorialState = () => {
+      const visible = Boolean(document.querySelector('div._2f84c'));
+
+      if (visible && !tutorialVisible) {
+        tutorialVisible = true;
+        stopGameplay('tutorial-open');
+      } else if (!visible && tutorialVisible) {
+        tutorialVisible = false;
+      }
+    };
+
+    const observer = new MutationObserver(syncTutorialState);
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    syncTutorialState();
+  }
+
+  function setupInterlevelObserver() {
+    let interlevelVisible = false;
+
+    const syncInterlevelState = () => {
+      const visible = Boolean(document.querySelector('button._4e75b'));
+
+      if (visible && !interlevelVisible) {
+        interlevelVisible = true;
+        stopGameplay('interlevel');
+      } else if (!visible && interlevelVisible) {
+        interlevelVisible = false;
+      }
+    };
+
+    const observer = new MutationObserver(syncInterlevelState);
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    syncInterlevelState();
+  }
+
   function init() {
     debugLog('Initializing Robocot customizations');
     debugLog('Document ready state:', document.readyState);
     debugLog('Root element exists:', !!document.getElementById('root'));
     debugLog('User Agent:', navigator.userAgent);
+
+    try {
+      blockContextMenu();
+      initYsdk();
+      debugLog('YaGames SDK init triggered');
+    } catch (e) {
+      debugLog('Error triggering YaGames SDK init:', e.message);
+    }
 
     try {
       resetNavigationForWebView();
@@ -460,6 +684,38 @@
       debugLog('enableWebViewVideoSupport completed');
     } catch (e) {
       debugLog('Error in enableWebViewVideoSupport:', e.message);
+    }
+
+    try {
+      setupStartButtonHandler();
+      debugLog('setupStartButtonHandler completed');
+    } catch (e) {
+      debugLog('Error in setupStartButtonHandler:', e.message);
+    }
+
+    try {
+      setupTrainingModalObserver();
+      debugLog('setupTrainingModalObserver completed');
+    } catch (e) {
+      debugLog('Error in setupTrainingModalObserver:', e.message);
+    }
+
+    try {
+      setupInterlevelObserver();
+      debugLog('setupInterlevelObserver completed');
+    } catch (e) {
+      debugLog('Error in setupInterlevelObserver:', e.message);
+    }
+
+    try {
+      if (document.readyState === 'complete') {
+        markGameLoaded();
+      } else {
+        window.addEventListener('load', markGameLoaded, { once: true });
+      }
+      debugLog('load event listener for LoadingAPI.ready configured');
+    } catch (e) {
+      debugLog('Error configuring LoadingAPI ready trigger:', e.message);
     }
 
     mobileQuery.addEventListener('change', applyResponsiveLogoBehavior);
