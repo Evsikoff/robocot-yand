@@ -2671,13 +2671,16 @@
       debugLog('Could not clear sessionStorage:', e.message);
     }
 
-    if (window.location.pathname !== '/' || window.location.hash) {
-      debugLog('Redirecting to root from:', {
-        pathname: window.location.pathname,
+    const targetUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+
+    if (window.location.href !== targetUrl || window.location.hash) {
+      debugLog('Redirecting to clean URL from:', {
+        current: window.location.href,
+        target: targetUrl,
         hash: window.location.hash
       });
       sessionStorage.setItem(resetFlag, 'done');
-      window.location.replace('/');
+      window.location.replace(targetUrl);
       return;
     }
 
