@@ -265,9 +265,11 @@
     const style = document.createElement('style');
     style.id = mobileButtonStyleId;
     style.textContent = `
-      /* Adjust "Выбрать уровень" button for all devices */
+      /* Center "Выбрать уровень" button on all devices */
       .be2f2 {
-        top: calc(50% + 100px) !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
       }
 
       /* Adjust note button for all devices */
@@ -278,7 +280,9 @@
       /* Fine tune button positions for landscape orientation */
       @media screen and (orientation: landscape) {
         .be2f2 {
-          top: calc(50% + 70px) !important;
+          top: 50% !important;
+          left: 50% !important;
+          transform: translate(-50%, -50%) !important;
         }
 
         ._400b2 {
