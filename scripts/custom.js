@@ -2589,6 +2589,18 @@
     return isWebView;
   }
 
+  // Detect if the game is embedded on Yandex Games in an iframe
+  function isYandexIframe() {
+    const inIframe = window.self !== window.top;
+    const search = window.location.search.toLowerCase();
+    const referrer = document.referrer.toLowerCase();
+    const hasYandexParam = search.includes('yandex') || search.includes('ya_app_id') || search.includes('app-id');
+    const isYandexReferrer = referrer.includes('yandex.ru') || referrer.includes('yandex.com');
+    const result = inIframe && (hasYandexParam || isYandexReferrer);
+    debugLog('isYandexIframe:', result, { inIframe, hasYandexParam, isYandexReferrer });
+    return result;
+  }
+
   // Safe storage wrapper
   const safeStorage = {
     getItem: function(storage, key) {
@@ -2619,9 +2631,9 @@
     }
   };
 
-  // Reset navigation to home page for WebView on first load
+  // Reset navigation to home page for WebView or Yandex iframe on first load
   function resetNavigationForWebView() {
-    if (!isAndroidWebView()) return;
+    if (!(isAndroidWebView() || isYandexIframe())) return;
 
     debugLog('resetNavigationForWebView called');
 
