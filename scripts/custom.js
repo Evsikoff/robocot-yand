@@ -2684,20 +2684,84 @@
       debugLog('Could not clear sessionStorage:', e.message);
     }
 
-    const targetUrl = `${window.location.origin}${window.location.pathname}${window.location.search}#/`;
-
-    if (window.location.href !== targetUrl || window.location.hash !== '#/') {
-      debugLog('Redirecting to clean URL from:', {
-        current: window.location.href,
-        target: targetUrl,
-        hash: window.location.hash
-      });
-      sessionStorage.setItem(resetFlag, 'done');
-      window.location.replace(targetUrl);
-      return;
-    }
-
+    // Don't redirect for Yandex iframe - let React Router handle the initial navigation
+    // Just clear storage and let the app load naturally
+    debugLog('Storage cleared, allowing React Router to handle navigation');
     sessionStorage.setItem(resetFlag, 'done');
+  }
+
+  // Auto-redirect from blank screen to start page
+  function detectAndFixBlankScreen() {
+    // Only run in Yandex iframe
+    if (!isYandexIframe()) return;
+
+    let checkCount = 0;
+    const maxChecks = 10;
+    const checkInterval = 500; // Check every 500ms
+
+    const checkForBlankScreen = () => {
+      checkCount++;
+
+      try {
+        const root = document.getElementById('root');
+        if (!root) {
+          debugLog('Root element not found, skipping blank screen check');
+          return;
+        }
+
+        // Look for the music note button (._400b2)
+        const musicButton = root.querySelector('._400b2');
+
+        // Look for back button - it contains "Назад" text or back arrow
+        const backButton = Array.from(root.querySelectorAll('button, a')).find(el =>
+          el.textContent.includes('Назад') || el.textContent.includes('назад')
+        );
+
+        // Count significant interactive elements (buttons, links, inputs)
+        const interactiveElements = root.querySelectorAll('button:not([class*="400b2"]), a[href*="#/"], input, textarea, select');
+
+        // Check if we're on a blank screen:
+        // - Music button exists
+        // - Back button exists
+        // - Very few other interactive elements (less than 3, excluding music and back buttons)
+        const isBlankScreen = musicButton && backButton && interactiveElements.length < 3;
+
+        debugLog('Blank screen check:', {
+          checkCount,
+          hasMusicButton: !!musicButton,
+          hasBackButton: !!backButton,
+          interactiveCount: interactiveElements.length,
+          isBlankScreen,
+          currentHash: window.location.hash
+        });
+
+        if (isBlankScreen) {
+          debugLog('Blank screen detected! Clicking back button to return to start page');
+
+          // Click the back button to navigate to start page
+          if (backButton) {
+            backButton.click();
+          } else {
+            // Fallback: use browser history
+            window.history.back();
+          }
+
+          return; // Stop checking
+        }
+
+        // Continue checking if we haven't reached max checks
+        if (checkCount < maxChecks) {
+          setTimeout(checkForBlankScreen, checkInterval);
+        } else {
+          debugLog('Blank screen detection finished after', maxChecks, 'checks');
+        }
+      } catch (e) {
+        debugLog('Error in blank screen detection:', e.message);
+      }
+    };
+
+    // Start checking after a short delay to let React render
+    setTimeout(checkForBlankScreen, 1000);
   }
 
   // Debug function to log page components when not in game
@@ -3286,6 +3350,13 @@
       debugLog('resetNavigationForWebView completed');
     } catch (e) {
       debugLog('Error in resetNavigationForWebView:', e.message);
+    }
+
+    try {
+      detectAndFixBlankScreen();
+      debugLog('detectAndFixBlankScreen started');
+    } catch (e) {
+      debugLog('Error in detectAndFixBlankScreen:', e.message);
     }
 
     try {
