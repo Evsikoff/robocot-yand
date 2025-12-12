@@ -5,7 +5,24 @@
   const mobileButtonStyleId = 'robocot-mobile-button-style';
 
   const logoFileName = 'logo.png';
-  const logoSrc = new URL(`../${logoFileName}`, document.currentScript?.src || window.location.href).href;
+  // Compute base URL using preload links (same approach as webpack publicPath)
+  // This ensures correct URL resolution in Yandex Games iframe
+  const getBaseUrl = () => {
+    const links = document.querySelectorAll('link[rel="preload"][as="script"]');
+    for (let i = 0; i < links.length; i++) {
+      const href = links[i].href;
+      if (href && href.indexOf('scripts/') > -1) {
+        return href.substring(0, href.lastIndexOf('scripts/'));
+      }
+    }
+    // Fallback to document.currentScript or window.location
+    const scriptSrc = document.currentScript?.src;
+    if (scriptSrc) {
+      return new URL('../', scriptSrc).href;
+    }
+    return window.location.href.replace(/[?#].*$/, '').replace(/[^\/]*$/, '');
+  };
+  const logoSrc = getBaseUrl() + logoFileName;
   const logoDataUri = [
     'data:image/png;base64,',
     'iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAYAAAD0eNT6AAAQAElEQVR4Aey9CaBlV1klvL69z3Cn9169mlKZyECYVUDEsduhxW6cum0Vlb+7UduWURQcGrVt',
