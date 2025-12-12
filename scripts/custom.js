@@ -2700,6 +2700,93 @@
     sessionStorage.setItem(resetFlag, 'done');
   }
 
+  // Detect and auto-fix blank screen on Yandex Games
+  function detectAndFixBlankScreen() {
+    // Only run in Yandex iframe
+    if (!isYandexIframe()) return;
+
+    let checkCount = 0;
+    const maxChecks = 15;
+    const checkInterval = 800; // Check every 800ms
+
+    const checkForBlankScreen = () => {
+      checkCount++;
+
+      try {
+        const root = document.getElementById('root');
+        if (!root) {
+          debugLog('Blank screen check: root not found');
+          return;
+        }
+
+        // Check for start page indicators
+        const buttons = root.querySelectorAll('button');
+        const links = root.querySelectorAll('a');
+        const headings = root.querySelectorAll('h1, h2, h3');
+
+        // Look for "Начать игру" button (indicates proper start page)
+        const hasStartButton = Array.from(buttons).some(btn =>
+          btn.textContent.includes('Начать игру') || btn.textContent.includes('Начать')
+        );
+
+        // Look for main heading (indicates proper start page)
+        const hasMainHeading = headings.length > 0;
+
+        // Look for back button/link (indicates blank page)
+        const hasBackButton = Array.from(links).some(link =>
+          link.textContent.includes('Назад') || link.textContent.includes('назад')
+        );
+
+        // Blank screen detection logic:
+        // - No "Начать игру" button AND
+        // - No headings AND
+        // - Has back button
+        const isBlankScreen = !hasStartButton && !hasMainHeading && hasBackButton;
+
+        debugLog('Blank screen check #' + checkCount + ':', {
+          hasStartButton,
+          hasMainHeading,
+          hasBackButton,
+          isBlankScreen,
+          pathname: window.location.pathname,
+          hash: window.location.hash
+        });
+
+        if (isBlankScreen) {
+          debugLog('BLANK SCREEN DETECTED! Redirecting to start page...');
+
+          // Redirect to clean start page
+          const targetUrl = `${window.location.origin}/`;
+
+          debugLog('Redirecting from', window.location.href, 'to', targetUrl);
+
+          // Use replace to avoid adding to history
+          window.location.replace(targetUrl);
+
+          return; // Stop checking
+        }
+
+        // If we see the start button or heading, we're on the right page
+        if (hasStartButton || hasMainHeading) {
+          debugLog('Start page detected - stopping blank screen checks');
+          return;
+        }
+
+        // Continue checking if we haven't reached max checks
+        if (checkCount < maxChecks) {
+          setTimeout(checkForBlankScreen, checkInterval);
+        } else {
+          debugLog('Blank screen detection stopped after', maxChecks, 'checks');
+        }
+      } catch (e) {
+        debugLog('Error in blank screen detection:', e.message);
+      }
+    };
+
+    // Start checking after a delay to let React render
+    setTimeout(checkForBlankScreen, 1000);
+  }
+
   function injectHidingStyles() {
     if (document.getElementById(styleId)) return;
 
@@ -3142,6 +3229,13 @@
       debugLog('resetNavigationForWebView completed');
     } catch (e) {
       debugLog('Error in resetNavigationForWebView:', e.message);
+    }
+
+    try {
+      detectAndFixBlankScreen();
+      debugLog('detectAndFixBlankScreen started');
+    } catch (e) {
+      debugLog('Error in detectAndFixBlankScreen:', e.message);
     }
 
     try {
