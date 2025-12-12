@@ -2684,9 +2684,9 @@
       debugLog('Could not clear sessionStorage:', e.message);
     }
 
-    const targetUrl = `${window.location.origin}${window.location.pathname}${window.location.search}#/`;
+    const targetUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
 
-    if (window.location.href !== targetUrl || window.location.hash !== '#/') {
+    if (window.location.href !== targetUrl || window.location.hash) {
       debugLog('Redirecting to clean URL from:', {
         current: window.location.href,
         target: targetUrl,
