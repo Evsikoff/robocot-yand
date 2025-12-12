@@ -2755,8 +2755,10 @@
         if (isBlankScreen) {
           debugLog('BLANK SCREEN DETECTED! Redirecting to start page...');
 
-          // Redirect to clean start page
-          const targetUrl = `${window.location.origin}/`;
+          // Redirect to clean start page, preserving query parameters
+          // Original URL might be: /482857/.../index.html?draft=true&lang=ru&...#hash
+          // Target URL should be: /?draft=true&lang=ru&... (no hash, clean path)
+          const targetUrl = `${window.location.origin}/${window.location.search}`;
 
           debugLog('Redirecting from', window.location.href, 'to', targetUrl);
 
