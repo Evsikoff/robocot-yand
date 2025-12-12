@@ -115,7 +115,21 @@
                 return f.d(r, "a", r), r
             }, f.o = function(e, r) {
                 return Object.prototype.hasOwnProperty.call(e, r)
-            }, f.p = "";
+            }, f.p = function() {
+                // Dynamically compute publicPath for Yandex Games compatibility
+                // Use preload links from <head> to get the base path
+                var links = document.querySelectorAll('link[rel="preload"][as="script"]');
+                for (var i = 0; i < links.length; i++) {
+                    var href = links[i].href; // href is resolved to absolute URL
+                    if (href && href.indexOf('scripts/') > -1) {
+                        // Extract base path before 'scripts/'
+                        return href.substring(0, href.lastIndexOf('scripts/'));
+                    }
+                }
+                // Fallback: derive from current page URL
+                var base = window.location.href.replace(/[?#].*$/, '').replace(/[^\/]*$/, '');
+                return base;
+            }();
             var r = window.webpackJsonp = window.webpackJsonp || [],
                 n = r.push.bind(r);
             r.push = e, r = r.slice();
