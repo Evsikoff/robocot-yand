@@ -2904,7 +2904,12 @@
   // Detect and auto-fix blank screen on Yandex Games
   function detectAndFixBlankScreen() {
     // Only run in Yandex iframe
-    if (!isYandexIframe()) return;
+    if (!isYandexIframe()) {
+      console.log('[BlankScreenFix] Not in Yandex iframe, skipping');
+      return;
+    }
+
+    console.log('[BlankScreenFix] Starting blank screen detection...');
 
     let checkCount = 0;
     const maxChecks = 15;
@@ -2916,7 +2921,7 @@
       try {
         const root = document.getElementById('root');
         if (!root) {
-          debugLog('Blank screen check: root not found');
+          console.log('[BlankScreenFix] Root element not found');
           return;
         }
 
@@ -2944,24 +2949,28 @@
         // - Has back button
         const isBlankScreen = !hasStartButton && !hasMainHeading && hasBackButton;
 
-        debugLog('Blank screen check #' + checkCount + ':', {
+        console.log(`[BlankScreenFix] Check #${checkCount}:`, {
           hasStartButton,
           hasMainHeading,
           hasBackButton,
           isBlankScreen,
+          buttonsCount: buttons.length,
+          linksCount: links.length,
+          headingsCount: headings.length,
           pathname: window.location.pathname,
           hash: window.location.hash
         });
 
         if (isBlankScreen) {
-          debugLog('BLANK SCREEN DETECTED! Redirecting to start page...');
+          console.log('%c[BlankScreenFix] 🚨 BLANK SCREEN DETECTED! Redirecting...', 'color: red; font-weight: bold; font-size: 14px');
 
           // Redirect to clean start page, preserving query parameters
           // Original URL might be: /482857/.../index.html?draft=true&lang=ru&...#hash
           // Target URL should be: /?draft=true&lang=ru&... (no hash, clean path)
           const targetUrl = `${window.location.origin}/${window.location.search}`;
 
-          debugLog('Redirecting from', window.location.href, 'to', targetUrl);
+          console.log('[BlankScreenFix] Redirecting from:', window.location.href);
+          console.log('[BlankScreenFix] Redirecting to:', targetUrl);
 
           // Use replace to avoid adding to history
           window.location.replace(targetUrl);
@@ -2971,7 +2980,7 @@
 
         // If we see the start button or heading, we're on the right page
         if (hasStartButton || hasMainHeading) {
-          debugLog('Start page detected - stopping blank screen checks');
+          console.log('%c[BlankScreenFix] ✅ Start page detected - stopping checks', 'color: green; font-weight: bold');
           return;
         }
 
@@ -2979,10 +2988,10 @@
         if (checkCount < maxChecks) {
           setTimeout(checkForBlankScreen, checkInterval);
         } else {
-          debugLog('Blank screen detection stopped after', maxChecks, 'checks');
+          console.log('[BlankScreenFix] Detection stopped after', maxChecks, 'checks');
         }
       } catch (e) {
-        debugLog('Error in blank screen detection:', e.message);
+        console.error('[BlankScreenFix] Error:', e);
       }
     };
 
