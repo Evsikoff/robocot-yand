@@ -2689,20 +2689,319 @@
       debugLog('Could not clear sessionStorage:', e.message);
     }
 
-    const targetUrl = `${window.location.origin}${window.location.pathname}${window.location.search}#/`;
+    // Don't redirect for Yandex iframe - let React Router handle the initial navigation
+    // Just clear storage and let the app load naturally
+    debugLog('Storage cleared, allowing React Router to handle navigation');
+    sessionStorage.setItem(resetFlag, 'done');
+  }
 
-    if (window.location.href !== targetUrl || window.location.hash !== '#/') {
-      debugLog('Redirecting to clean URL from:', {
-        current: window.location.href,
-        target: targetUrl,
-        hash: window.location.hash
-      });
-      sessionStorage.setItem(resetFlag, 'done');
-      window.location.replace(targetUrl);
+  // Auto-redirect from blank screen to start page
+  function detectAndFixBlankScreen() {
+    // Only run in Yandex iframe
+    if (!isYandexIframe()) return;
+
+    let checkCount = 0;
+    const maxChecks = 10;
+    const checkInterval = 500; // Check every 500ms
+
+    const checkForBlankScreen = () => {
+      checkCount++;
+
+      try {
+        const root = document.getElementById('root');
+        if (!root) {
+          debugLog('Root element not found, skipping blank screen check');
+          return;
+        }
+
+        // Look for the music note button (._400b2)
+        const musicButton = root.querySelector('._400b2');
+
+        // Look for back button - it contains "Назад" text or back arrow
+        const backButton = Array.from(root.querySelectorAll('button, a')).find(el =>
+          el.textContent.includes('Назад') || el.textContent.includes('назад')
+        );
+
+        // Count significant interactive elements (buttons, links, inputs)
+        const interactiveElements = root.querySelectorAll('button:not([class*="400b2"]), a[href*="#/"], input, textarea, select');
+
+        // Check if we're on a blank screen:
+        // - Music button exists
+        // - Back button exists
+        // - Very few other interactive elements (less than 3, excluding music and back buttons)
+        const isBlankScreen = musicButton && backButton && interactiveElements.length < 3;
+
+        debugLog('Blank screen check:', {
+          checkCount,
+          hasMusicButton: !!musicButton,
+          hasBackButton: !!backButton,
+          interactiveCount: interactiveElements.length,
+          isBlankScreen,
+          currentHash: window.location.hash
+        });
+
+        if (isBlankScreen) {
+          debugLog('Blank screen detected! Clicking back button to return to start page');
+
+          // Click the back button to navigate to start page
+          if (backButton) {
+            backButton.click();
+          } else {
+            // Fallback: use browser history
+            window.history.back();
+          }
+
+          return; // Stop checking
+        }
+
+        // Continue checking if we haven't reached max checks
+        if (checkCount < maxChecks) {
+          setTimeout(checkForBlankScreen, checkInterval);
+        } else {
+          debugLog('Blank screen detection finished after', maxChecks, 'checks');
+        }
+      } catch (e) {
+        debugLog('Error in blank screen detection:', e.message);
+      }
+    };
+
+    // Start checking after a short delay to let React render
+    setTimeout(checkForBlankScreen, 1000);
+  }
+
+  // Debug function to log page components when not in game
+  function logPageComponents() {
+    // Only run in Yandex iframe
+    if (!isYandexIframe()) return;
+
+    let logCount = 0;
+    const maxLogs = 20;
+    const logInterval = 1000; // Log every 1 second
+
+    const analyzeAndLog = () => {
+      logCount++;
+
+      try {
+        const root = document.getElementById('root');
+        if (!root) {
+          console.log('[RobocotDebug] Root element not found');
+          return;
+        }
+
+        const hash = window.location.hash;
+        const pathname = window.location.pathname;
+        const href = window.location.href;
+
+        // Try to detect if we're in a game or on main page
+        // Main page typically has hash like '', '#/', or '#/start'
+        // Game pages typically have hash like '#/game' or '#/level/1'
+        const isInGame = hash.includes('game') || hash.includes('level') || hash.includes('spill');
+
+        // Always log, but especially when not in game
+        if (!isInGame || logCount <= 3) {
+          console.log('='.repeat(80));
+          console.log(`[RobocotDebug] Page Analysis #${logCount} - ${new Date().toISOString()}`);
+          console.log('='.repeat(80));
+
+          console.log('📍 Location Info:');
+          console.log('  - href:', href);
+          console.log('  - pathname:', pathname);
+          console.log('  - hash:', hash || '(empty)');
+          console.log('  - isInGame:', isInGame);
+          console.log('');
+
+          // Count different types of elements
+          const buttons = root.querySelectorAll('button');
+          const links = root.querySelectorAll('a');
+          const inputs = root.querySelectorAll('input, textarea, select');
+          const images = root.querySelectorAll('img');
+          const headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
+          const paragraphs = root.querySelectorAll('p');
+
+          console.log('📊 Element Counts:');
+          console.log('  - Buttons:', buttons.length);
+          console.log('  - Links:', links.length);
+          console.log('  - Inputs:', inputs.length);
+          console.log('  - Images:', images.length);
+          console.log('  - Headings:', headings.length);
+          console.log('  - Paragraphs:', paragraphs.length);
+          console.log('');
+
+          // Log all buttons with their text and classes
+          console.log('🔘 Buttons:');
+          buttons.forEach((btn, idx) => {
+            const text = btn.textContent.trim().substring(0, 50);
+            const classes = btn.className;
+            const visible = btn.offsetParent !== null;
+            console.log(`  ${idx + 1}. "${text}" | class="${classes}" | visible=${visible}`);
+          });
+          console.log('');
+
+          // Log all links with their text and href
+          console.log('🔗 Links:');
+          links.forEach((link, idx) => {
+            const text = link.textContent.trim().substring(0, 50);
+            const href = link.getAttribute('href');
+            const visible = link.offsetParent !== null;
+            console.log(`  ${idx + 1}. "${text}" | href="${href}" | visible=${visible}`);
+          });
+          console.log('');
+
+          // Log all headings
+          console.log('📝 Headings:');
+          headings.forEach((h, idx) => {
+            const text = h.textContent.trim().substring(0, 100);
+            const tag = h.tagName.toLowerCase();
+            console.log(`  ${idx + 1}. <${tag}> "${text}"`);
+          });
+          console.log('');
+
+          // Log special elements
+          const musicButton = root.querySelector('._400b2');
+          const backButton = Array.from(buttons).find(el =>
+            el.textContent.includes('Назад') || el.textContent.includes('назад')
+          );
+
+          console.log('🎵 Special Elements:');
+          console.log('  - Music button (._400b2):', !!musicButton, musicButton ? 'found' : 'not found');
+          console.log('  - Back button (Назад):', !!backButton, backButton ? `"${backButton.textContent.trim()}"` : 'not found');
+          console.log('');
+
+          // Log main sections
+          const nav = root.querySelector('nav');
+          const main = root.querySelector('main');
+          const sections = root.querySelectorAll('section, article, div[class*="container"], div[class*="wrapper"]');
+
+          console.log('📦 Page Structure:');
+          console.log('  - <nav>:', !!nav);
+          console.log('  - <main>:', !!main);
+          console.log('  - Sections/containers:', sections.length);
+          console.log('');
+
+          // Log all top-level divs under root with their classes
+          const topLevelDivs = Array.from(root.children).filter(el => el.tagName === 'DIV');
+          console.log('🎨 Top-level divs under root:');
+          topLevelDivs.forEach((div, idx) => {
+            const classes = div.className;
+            const childCount = div.children.length;
+            console.log(`  ${idx + 1}. class="${classes}" | children=${childCount}`);
+          });
+
+          console.log('='.repeat(80));
+          console.log('');
+        }
+
+        // Continue logging
+        if (logCount < maxLogs) {
+          setTimeout(analyzeAndLog, logInterval);
+        } else {
+          console.log('[RobocotDebug] Logging stopped after', maxLogs, 'iterations');
+        }
+      } catch (e) {
+        console.error('[RobocotDebug] Error in logging:', e);
+      }
+    };
+
+    // Start logging after a short delay
+    setTimeout(analyzeAndLog, 500);
+  }
+
+  // Detect and auto-fix blank screen on Yandex Games
+  function detectAndFixBlankScreen() {
+    // Only run in Yandex iframe
+    if (!isYandexIframe()) {
+      console.log('[BlankScreenFix] Not in Yandex iframe, skipping');
       return;
     }
 
-    sessionStorage.setItem(resetFlag, 'done');
+    console.log('[BlankScreenFix] Starting blank screen detection...');
+
+    let checkCount = 0;
+    const maxChecks = 15;
+    const checkInterval = 800; // Check every 800ms
+
+    const checkForBlankScreen = () => {
+      checkCount++;
+
+      try {
+        const root = document.getElementById('root');
+        if (!root) {
+          console.log('[BlankScreenFix] Root element not found');
+          return;
+        }
+
+        // Check for start page indicators
+        const buttons = root.querySelectorAll('button');
+        const links = root.querySelectorAll('a');
+        const headings = root.querySelectorAll('h1, h2, h3');
+
+        // Look for "Начать игру" button (indicates proper start page)
+        const hasStartButton = Array.from(buttons).some(btn =>
+          btn.textContent.includes('Начать игру') || btn.textContent.includes('Начать')
+        );
+
+        // Look for main heading (indicates proper start page)
+        const hasMainHeading = headings.length > 0;
+
+        // Look for back button/link (indicates blank page)
+        const hasBackButton = Array.from(links).some(link =>
+          link.textContent.includes('Назад') || link.textContent.includes('назад')
+        );
+
+        // Blank screen detection logic:
+        // - No "Начать игру" button AND
+        // - No headings AND
+        // - Has back button
+        const isBlankScreen = !hasStartButton && !hasMainHeading && hasBackButton;
+
+        console.log(`[BlankScreenFix] Check #${checkCount}:`, {
+          hasStartButton,
+          hasMainHeading,
+          hasBackButton,
+          isBlankScreen,
+          buttonsCount: buttons.length,
+          linksCount: links.length,
+          headingsCount: headings.length,
+          pathname: window.location.pathname,
+          hash: window.location.hash
+        });
+
+        if (isBlankScreen) {
+          console.log('%c[BlankScreenFix] 🚨 BLANK SCREEN DETECTED! Redirecting...', 'color: red; font-weight: bold; font-size: 14px');
+
+          // Redirect to clean start page, preserving query parameters
+          // Original URL might be: /482857/.../index.html?draft=true&lang=ru&...#hash
+          // Target URL should be: /?draft=true&lang=ru&... (no hash, clean path)
+          const targetUrl = `${window.location.origin}/${window.location.search}`;
+
+          console.log('[BlankScreenFix] Redirecting from:', window.location.href);
+          console.log('[BlankScreenFix] Redirecting to:', targetUrl);
+
+          // Use replace to avoid adding to history
+          window.location.replace(targetUrl);
+
+          return; // Stop checking
+        }
+
+        // If we see the start button or heading, we're on the right page
+        if (hasStartButton || hasMainHeading) {
+          console.log('%c[BlankScreenFix] ✅ Start page detected - stopping checks', 'color: green; font-weight: bold');
+          return;
+        }
+
+        // Continue checking if we haven't reached max checks
+        if (checkCount < maxChecks) {
+          setTimeout(checkForBlankScreen, checkInterval);
+        } else {
+          console.log('[BlankScreenFix] Detection stopped after', maxChecks, 'checks');
+        }
+      } catch (e) {
+        console.error('[BlankScreenFix] Error:', e);
+      }
+    };
+
+    // Start checking after a delay to let React render
+    setTimeout(checkForBlankScreen, 1000);
   }
 
   // Detect and auto-fix blank screen on Yandex Games
@@ -3234,6 +3533,13 @@
     debugLog('Document ready state:', document.readyState);
     debugLog('Root element exists:', !!document.getElementById('root'));
     debugLog('User Agent:', navigator.userAgent);
+
+    try {
+      logPageComponents();
+      console.log('[RobocotDebug] Component logging started - check console for detailed page analysis');
+    } catch (e) {
+      console.error('[RobocotDebug] Error starting component logging:', e.message);
+    }
 
     try {
       blockContextMenu();
