@@ -2684,19 +2684,9 @@
       debugLog('Could not clear sessionStorage:', e.message);
     }
 
-    const targetUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
-
-    if (window.location.href !== targetUrl || window.location.hash) {
-      debugLog('Redirecting to clean URL from:', {
-        current: window.location.href,
-        target: targetUrl,
-        hash: window.location.hash
-      });
-      sessionStorage.setItem(resetFlag, 'done');
-      window.location.replace(targetUrl);
-      return;
-    }
-
+    // Don't redirect for Yandex iframe - let React Router handle the initial navigation
+    // Just clear storage and let the app load naturally
+    debugLog('Storage cleared, allowing React Router to handle navigation');
     sessionStorage.setItem(resetFlag, 'done');
   }
 
