@@ -2509,8 +2509,8 @@
           return null;
         }
 
-        // Initialize SDK - language is auto-detected from URL params
-        return YaGames.init();
+        // Set Russian locale without the deprecated top-level `lang` option.
+        return YaGames.init({ i18n: { lang: 'ru' } });
       })
       .then((sdk) => {
         ysdkInstance = sdk;
