@@ -2610,7 +2610,12 @@
   function isYandexIframe() {
     // This game is designed for Yandex Games, so if we're in an iframe, reset to start screen
     const inIframe = window.self !== window.top;
-    debugLog('isYandexIframe:', inIframe, { inIframe });
+    console.log('[BlankScreenFix] isYandexIframe check:', {
+      inIframe,
+      'window.self': window.self,
+      'window.top': window.top,
+      'self !== top': window.self !== window.top
+    });
     return inIframe;
   }
 
@@ -2968,6 +2973,104 @@
           // Original URL might be: /482857/.../index.html?draft=true&lang=ru&...#hash
           // Target URL should be: /?draft=true&lang=ru&... (no hash, clean path)
           const targetUrl = `${window.location.origin}/${window.location.search}`;
+
+          console.log('[BlankScreenFix] Redirecting from:', window.location.href);
+          console.log('[BlankScreenFix] Redirecting to:', targetUrl);
+
+          // Use replace to avoid adding to history
+          window.location.replace(targetUrl);
+
+          return; // Stop checking
+        }
+
+        // If we see the start button or heading, we're on the right page
+        if (hasStartButton || hasMainHeading) {
+          console.log('%c[BlankScreenFix] ✅ Start page detected - stopping checks', 'color: green; font-weight: bold');
+          return;
+        }
+
+        // Continue checking if we haven't reached max checks
+        if (checkCount < maxChecks) {
+          setTimeout(checkForBlankScreen, checkInterval);
+        } else {
+          console.log('[BlankScreenFix] Detection stopped after', maxChecks, 'checks');
+        }
+      } catch (e) {
+        console.error('[BlankScreenFix] Error:', e);
+      }
+    };
+
+    // Start checking after a delay to let React render
+    setTimeout(checkForBlankScreen, 1000);
+  }
+
+  // Detect and auto-fix blank screen on Yandex Games
+  function detectAndFixBlankScreen() {
+    console.log('[BlankScreenFix] detectAndFixBlankScreen() function called');
+
+    // Only run in Yandex iframe
+    if (!isYandexIframe()) {
+      console.log('[BlankScreenFix] Not in Yandex iframe, skipping');
+      return;
+    }
+
+    console.log('[BlankScreenFix] Starting blank screen detection...');
+
+    let checkCount = 0;
+    const maxChecks = 15;
+    const checkInterval = 800; // Check every 800ms
+
+    const checkForBlankScreen = () => {
+      checkCount++;
+
+      try {
+        const root = document.getElementById('root');
+        if (!root) {
+          console.log('[BlankScreenFix] Root element not found');
+          return;
+        }
+
+        // Check for start page indicators
+        const buttons = root.querySelectorAll('button');
+        const links = root.querySelectorAll('a');
+        const headings = root.querySelectorAll('h1, h2, h3');
+
+        // Look for "Начать игру" button (indicates proper start page)
+        const hasStartButton = Array.from(buttons).some(btn =>
+          btn.textContent.includes('Начать игру') || btn.textContent.includes('Начать')
+        );
+
+        // Look for main heading (indicates proper start page)
+        const hasMainHeading = headings.length > 0;
+
+        // Look for back button/link (indicates blank page)
+        const hasBackButton = Array.from(links).some(link =>
+          link.textContent.includes('Назад') || link.textContent.includes('назад')
+        );
+
+        // Blank screen detection logic:
+        // - No "Начать игру" button AND
+        // - No headings AND
+        // - Has back button
+        const isBlankScreen = !hasStartButton && !hasMainHeading && hasBackButton;
+
+        console.log(`[BlankScreenFix] Check #${checkCount}:`, {
+          hasStartButton,
+          hasMainHeading,
+          hasBackButton,
+          isBlankScreen,
+          buttonsCount: buttons.length,
+          linksCount: links.length,
+          headingsCount: headings.length,
+          pathname: window.location.pathname,
+          hash: window.location.hash
+        });
+
+        if (isBlankScreen) {
+          console.log('%c[BlankScreenFix] 🚨 BLANK SCREEN DETECTED! Redirecting...', 'color: red; font-weight: bold; font-size: 14px');
+
+          // Redirect to clean start page
+          const targetUrl = `${window.location.origin}/`;
 
           console.log('[BlankScreenFix] Redirecting from:', window.location.href);
           console.log('[BlankScreenFix] Redirecting to:', targetUrl);
@@ -3423,6 +3526,9 @@
   }
 
   function init() {
+    console.log('[BlankScreenFix] ========================================');
+    console.log('[BlankScreenFix] init() function started');
+    console.log('[BlankScreenFix] ========================================');
     debugLog('Initializing Robocot customizations');
     debugLog('Document ready state:', document.readyState);
     debugLog('Root element exists:', !!document.getElementById('root'));
@@ -3451,10 +3557,11 @@
     }
 
     try {
+      console.log('[BlankScreenFix] init() calling detectAndFixBlankScreen()...');
       detectAndFixBlankScreen();
-      debugLog('detectAndFixBlankScreen started');
+      console.log('[BlankScreenFix] detectAndFixBlankScreen() called successfully');
     } catch (e) {
-      debugLog('Error in detectAndFixBlankScreen:', e.message);
+      console.error('[BlankScreenFix] Error calling detectAndFixBlankScreen:', e);
     }
 
     try {
