@@ -2610,7 +2610,12 @@
   function isYandexIframe() {
     // This game is designed for Yandex Games, so if we're in an iframe, reset to start screen
     const inIframe = window.self !== window.top;
-    debugLog('isYandexIframe:', inIframe, { inIframe });
+    console.log('[BlankScreenFix] isYandexIframe check:', {
+      inIframe,
+      'window.self': window.self,
+      'window.top': window.top,
+      'self !== top': window.self !== window.top
+    });
     return inIframe;
   }
 
@@ -2702,6 +2707,8 @@
 
   // Detect and auto-fix blank screen on Yandex Games
   function detectAndFixBlankScreen() {
+    console.log('[BlankScreenFix] detectAndFixBlankScreen() function called');
+
     // Only run in Yandex iframe
     if (!isYandexIframe()) {
       console.log('[BlankScreenFix] Not in Yandex iframe, skipping');
@@ -3220,6 +3227,9 @@
   }
 
   function init() {
+    console.log('[BlankScreenFix] ========================================');
+    console.log('[BlankScreenFix] init() function started');
+    console.log('[BlankScreenFix] ========================================');
     debugLog('Initializing Robocot customizations');
     debugLog('Document ready state:', document.readyState);
     debugLog('Root element exists:', !!document.getElementById('root'));
@@ -3241,10 +3251,11 @@
     }
 
     try {
+      console.log('[BlankScreenFix] init() calling detectAndFixBlankScreen()...');
       detectAndFixBlankScreen();
-      debugLog('detectAndFixBlankScreen started');
+      console.log('[BlankScreenFix] detectAndFixBlankScreen() called successfully');
     } catch (e) {
-      debugLog('Error in detectAndFixBlankScreen:', e.message);
+      console.error('[BlankScreenFix] Error calling detectAndFixBlankScreen:', e);
     }
 
     try {
