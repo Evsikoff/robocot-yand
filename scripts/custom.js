@@ -4,7 +4,7 @@
   const logoContainerId = 'robocot-logo-container';
   const mobileButtonStyleId = 'robocot-mobile-button-style';
 
-  const logoFileName = 'logo.png';
+  const logoFileName = './logo.png';
   // Compute base URL using preload links (same approach as webpack publicPath)
   // This ensures correct URL resolution in Yandex Games iframe
   const getBaseUrl = () => {
